@@ -1,0 +1,157 @@
+CREATE DATABASE restaurant_management;
+USE restaurant_management;
+
+-- menuitems
+CREATE TABLE menuitems (
+  item_id INT PRIMARY KEY,
+  item_name VARCHAR(50),
+  category VARCHAR(30),
+  price DECIMAL(10,2)
+);
+
+INSERT INTO menuitems VALUES
+(1,'chicken biryani','main dish',180),
+(2,'fried rice','main dish',120),
+(3,'gulab jamun','dessert',200),
+(4,'butter naan','main dish',150),
+(5,'egg dosa','main dish',90);
+
+-- tables (renamed to restaurant_tables to avoid keyword confusion)
+CREATE TABLE restaurant_tables (
+  table_id INT PRIMARY KEY,
+  table_number INT,
+  capacity INT,
+  status VARCHAR(30)
+);
+
+INSERT INTO restaurant_tables VALUES
+(1,11,5,'available'),
+(2,12,4,'reserved'),
+(3,13,6,'occupied'),
+(4,14,7,'available'),
+(5,15,3,'reserved');
+
+-- customers
+CREATE TABLE customers (
+  customer_id INT PRIMARY KEY,
+  customer_name VARCHAR(30),
+  email VARCHAR(50),
+  phone VARCHAR(20),
+  city VARCHAR(30)
+);
+
+INSERT INTO customers VALUES
+(1,'mythili','mythili@gmail.com','80976543','thiruvanamalai'),
+(2,'sharmi','sharmi@gmail.com','88009322','pattukottai'),
+(3,'banu','banu@gmail.com','96776434','kumbakonam'),
+(4,'ezhil','ezhil@gmail.com','80107558','thanjavur'),
+(5,'nila','nila@gmail.com','88443589','nagai');
+
+
+-- orders (correct, single table with total_amount)
+CREATE TABLE orders (
+  order_id INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT,
+  table_id INT,
+  order_date DATE NOT NULL,
+  total_amount DECIMAL(10,2) NOT NULL,
+  FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+  FOREIGN KEY (table_id) REFERENCES restaurant_tables(table_id)
+);
+
+INSERT INTO orders (customer_id, table_id, order_date, total_amount) VALUES
+(1,1,'2025-09-05',500.00),
+(2,2,'2025-11-06',400.00),
+(3,3,'2025-05-01',300.00),
+(4,4,'2025-12-30',600.00),
+(5,5,'2025-06-17',800.00);
+select* from orders;
+
+-- reservation
+CREATE TABLE reservation (
+  reservation_id INT PRIMARY KEY,
+  customer_id INT,
+  table_id INT,
+  reservation_date DATE,
+  reservation_status VARCHAR(30),
+  FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+  FOREIGN KEY (table_id) REFERENCES restaurant_tables(table_id)
+);
+
+INSERT INTO reservation VALUES
+(1,1,1,'2025-10-01','confirmed'),
+(2,2,2,'2025-10-01','pending'),
+(3,3,3,'2025-10-01','cancelled'),
+(4,4,4,'2025-10-01','confirmed'),
+(5,5,5,'2025-10-01','confirmed');
+
+-- joins
+SELECT 
+    customers.customer_name,
+    customers.city,
+    orders.order_id,
+    orders.order_date,
+    orders.total_amount
+FROM customers
+JOIN orders 
+    ON customers.customer_id = orders.customer_id;
+    
+-- subquery
+SELECT customer_id, customer_name
+FROM customers
+WHERE customer_id IN (
+  SELECT customer_id
+  FROM orders
+  WHERE total_amount > (SELECT AVG(total_amount) FROM orders)
+);
+
+-- view
+CREATE VIEW customer_orders_view AS
+SELECT 
+    customers.customer_name,
+    customers.city,
+    orders.order_id,
+    orders.order_date,
+    orders.total_amount
+FROM customers
+JOIN orders 
+    ON customers.customer_id = orders.customer_id;
+    
+-- group by
+SELECT customer_id, SUM(total_amount) AS total_spent
+FROM orders
+GROUP BY customer_id;
+
+-- trigger
+CREATE TABLE order_changes_log (
+  log_id INT AUTO_INCREMENT PRIMARY KEY,
+  order_id INT,
+  old_amount DECIMAL(10,2),
+  new_amount DECIMAL(10,2),
+  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- alter
+alter table customers
+add address varchar(100);
+update customers
+set address="no 16, siavn street chennai"
+where customer_id=3;
+select* from customers;
+
+
+DELIMITER $$
+CREATE TRIGGER trg_orders_amount_update
+BEFORE UPDATE ON orders
+FOR EACH ROW
+BEGIN
+  IF OLD.total_amount <> NEW.total_amount THEN
+    INSERT INTO order_changes_log(order_id, old_amount, new_amount)
+    VALUES (OLD.order_id, OLD.total_amount, NEW.total_amount);
+  END IF;
+END $$
+DELIMITER ;
+
+
+
+    
